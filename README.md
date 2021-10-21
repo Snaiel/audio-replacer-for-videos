@@ -1,2 +1,4 @@
 # automating_pysimplegui_lessons
-script for some compressing the audio and maybe other stuff
+script for applying polished audio to video file
+
+make sure to put video and audio in the same folder as script
