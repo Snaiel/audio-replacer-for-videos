@@ -6,9 +6,9 @@ def main():
     new_audio_name = input('name of new audio file: ')
     final_lesson_name = input('set name of final file: ')
 
-    lesson = VideoFileClip('media/' + lesson_name).subclip(0,10)
+    lesson = VideoFileClip('media/' + lesson_name)
 
-    new_audio = AudioFileClip('media/' + new_audio_name).subclip(0,10)
+    new_audio = AudioFileClip('media/' + new_audio_name)
     new_clip = lesson.set_audio(new_audio)
     new_clip.write_videofile('media/' + final_lesson_name)
 
