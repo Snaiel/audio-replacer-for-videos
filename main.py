@@ -33,9 +33,9 @@ def create_process_list():
 
 def main():
 
-    media_path = getcwd() + '\\media'
-    media_files = [f for f in listdir(media_path)[1:] if isfile(join(media_path, f))]
-
+    media_path = getcwd() + '/media'
+    media_files = [f for f in listdir(media_path) if isfile(join(media_path, f))]
+    media_files.remove('.gitignore')
     print_media(media_files)
 
     processes = create_process_list()
