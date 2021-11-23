@@ -2,6 +2,7 @@ import PySimpleGUI as sg
 from moviepy.editor import VideoFileClip, AudioFileClip
 from os import getcwd
 from threading import Thread
+from proglog import TqdmProgressBarLogger
 
 processes = ['add new process']
 
@@ -43,13 +44,51 @@ def create_new_process():
 def start_processes():
     toggle_disable_elements()
     for process in processes[1:]:
+        my_logger = MyBarLogger(str(process))
+
         lesson = VideoFileClip('media/' + process.original_video)
         new_audio = AudioFileClip('media/' + process.new_audio)
         new_clip = lesson.set_audio(new_audio)
-        new_clip.write_videofile('media/' + process.final_name)
+        new_clip.write_videofile('media/' + process.final_name, logger=my_logger)
     toggle_disable_elements(False)
 
+# Class that accesses the MoviePy progress bar to display it using the PySimpleGUI Graph
+class MyBarLogger(TqdmProgressBarLogger):
+
+    def __init__(self, name):
+        self.pre_render = False
+        self.rendering = False
+        self.name = name
+        super().__init__()
+
+    def callback(self, **changes):
+        # Every time the logger is updated, this function is called
+        if len(self.bars):
+            print(self.bars)
+            for figure in progress_bar.get_figures_at_location((0,35)):
+                progress_bar.delete_figure(figure)
+
+            percentage = next(reversed(self.bars.items()))[1]['index'] / next(reversed(self.bars.items()))[1]['total']
+
+            length = percentage * 470
+            progress_bar.send_figure_to_back(progress_bar.draw_rectangle(top_left=(0,35), bottom_right=(length,0), fill_color='#a5e8c0', line_width=0))
+
+            if next(reversed(self.bars.items()))[0] == 'chunk':
+                if self.pre_render == False:
+                    change_progress_text(f'pre-rendering... ({self.name})')
+                    self.pre_render = True
+                    self.rendering = False
+            else:
+                if self.rendering == False:
+                    change_progress_text(f'rendering... ({self.name})')
+                    self.pre_render = False
+                    self.rendering = True
+
+
+
+
 # GUI Creation
+
 
 def change_input_values(type=None):
     if type == 'reset':
@@ -73,7 +112,7 @@ def change_progress_text(message):
 
 media_path = getcwd() + '/media'
 
-print(media_path)
+# print(media_path)
 
 create_process_form = sg.Column(
     layout=[
@@ -96,9 +135,9 @@ process_list = sg.Listbox(
 
 progress_bar = sg.Graph(
     key='-PROGRESS_BAR-',
-    canvas_size=(590, 35),
+    canvas_size=(470, 35),
     graph_bottom_left=(0,0),
-    graph_top_right=(590, 35),
+    graph_top_right=(470, 35),
     background_color='#ffffff',
     pad=(5,8)
 )
