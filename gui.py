@@ -1,8 +1,6 @@
 import PySimpleGUI as sg
 from os import getcwd
 
-from PySimpleGUI.PySimpleGUI import LISTBOX_SELECT_MODE_SINGLE, TEXT_LOCATION_LEFT
-
 processes = ['add new process']
 
 class Lesson():
@@ -14,10 +12,20 @@ class Lesson():
     def __str__(self) -> str:
         return self.final_name.split('.')[0]
 
+def check_if_process_exists():
+    for process in processes[1:]:
+        if values['-FINAL_NAME-'] == str(process):
+            return True
+    else:
+        return False
+
 def create_new_process():
     original_video = values['-ORIGINAL_VIDEO-']
     new_audio = values['-NEW_AUDIO-']
     final_name = values['-FINAL_NAME-']
+
+    if check_if_process_exists() == True:
+        return 'duplicate names not allowed'
 
     if original_video != 'original video' and new_audio != 'edited audio' and final_name != 'final file name':
         if len(values['-FINAL_NAME-'].split('.')) == 1:
@@ -31,10 +39,24 @@ def create_new_process():
 
 
 def start_processes():
+    if len(processes) == 1:
+        for figure in progress_bar.get_figures_at_location((10,17)):
+            progress_bar.delete_figure(figure)
+        progress_bar.draw_text(text='no processes', location=(10, 17), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
     for process in processes:
         pass
 
 # GUI Creation
+
+def change_input_values(type=None):
+    if type == 'reset':
+            window['-ORIGINAL_VIDEO-'].update(value='original video')
+            window['-NEW_AUDIO-'].update(value='edited audio')
+            window['-FINAL_NAME-'].update(value='final file name')
+    else:
+        window['-ORIGINAL_VIDEO-'].update(value=values['-PROCESS_LIST-'][0].original_video)
+        window['-NEW_AUDIO-'].update(value=values['-PROCESS_LIST-'][0].new_audio)
+        window['-FINAL_NAME-'].update(value=values['-PROCESS_LIST-'][0].final_name)
 
 media_path = getcwd() + '/media'
 
@@ -52,10 +74,11 @@ create_process_form = sg.Column(
 
 process_list = sg.Listbox(
     key='-PROCESS_LIST-',
-    select_mode=LISTBOX_SELECT_MODE_SINGLE,
+    select_mode=sg.LISTBOX_SELECT_MODE_SINGLE,
     values=processes,
     size=(15,7),
-    enable_events=True
+    enable_events=True,
+    right_click_menu=['', ['Delete']]
 )
 
 progress_bar = sg.Graph(
@@ -74,7 +97,7 @@ layout = [
 
 window = sg.Window('audio replacer', layout, size=(600,270), finalize=True)
 
-progress_bar.draw_text(text='not started', location=(10, 17), text_location=TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
+progress_bar.draw_text(text='not started', location=(10, 17), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
 
 while True:
     event, values = window.read()
@@ -87,16 +110,29 @@ while True:
         if len(values[event].split('.')) != 1:
             window[event].update(values[event].split('/')[-1])
 
+    # Change values according to selected process
+    if event == '-PROCESS_LIST-':
+        change_input_values('reset' if values[event][0] == 'add new process' else None)
+
     # Add process
     if event == 'add process':
         message = create_new_process()
         for figure in progress_bar.get_figures_at_location((10,17)):
             progress_bar.delete_figure(figure)
-        progress_bar.draw_text(text=message, location=(10, 17), text_location=TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
+        progress_bar.draw_text(text=message, location=(10, 17), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
         if message == 'process added':
             window['-PROCESS_LIST-'].update(processes)
-        
-        
-            
+            change_input_values('reset')
+
+    # Delete process
+    if event == 'Delete':
+        for process in processes[1:]:
+            if process == values['-PROCESS_LIST-'][0]:
+                processes.remove(process)
+        window['-PROCESS_LIST-'].update(processes)
+        change_input_values('reset')
+
+    if event == 'start':
+        start_processes()
 
 window.close()
