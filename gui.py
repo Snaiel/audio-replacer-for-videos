@@ -1,5 +1,7 @@
 import PySimpleGUI as sg
+from moviepy.editor import VideoFileClip, AudioFileClip
 from os import getcwd
+from threading import Thread
 
 processes = ['add new process']
 
@@ -39,12 +41,13 @@ def create_new_process():
 
 
 def start_processes():
-    if len(processes) == 1:
-        for figure in progress_bar.get_figures_at_location((10,17)):
-            progress_bar.delete_figure(figure)
-        progress_bar.draw_text(text='no processes', location=(10, 17), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
-    for process in processes:
-        pass
+    toggle_disable_elements()
+    for process in processes[1:]:
+        lesson = VideoFileClip('media/' + process.original_video)
+        new_audio = AudioFileClip('media/' + process.new_audio)
+        new_clip = lesson.set_audio(new_audio)
+        new_clip.write_videofile('media/' + process.final_name)
+    toggle_disable_elements(False)
 
 # GUI Creation
 
@@ -58,16 +61,26 @@ def change_input_values(type=None):
         window['-NEW_AUDIO-'].update(value=values['-PROCESS_LIST-'][0].new_audio)
         window['-FINAL_NAME-'].update(value=values['-PROCESS_LIST-'][0].final_name)
 
+def toggle_disable_elements(disabled=True):
+    elements = ['-PROCESS_LIST-', '-ORIGINAL_VIDEO-', '-NEW_AUDIO-', '-FINAL_NAME-', '-BROWSE_VIDEO-', '-BROWSE_AUDIO-', '-ADD_PROCESS-', '-START-']
+    for element in elements:
+        window[element].update(disabled=disabled)
+
+def change_progress_text(message):
+    for figure in progress_bar.get_figures_at_location((10,17)):
+        progress_bar.delete_figure(figure)
+    progress_bar.draw_text(text=message, location=(10, 17), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
+
 media_path = getcwd() + '/media'
 
 print(media_path)
 
 create_process_form = sg.Column(
     layout=[
-        [sg.Input(key='-ORIGINAL_VIDEO-', size=(12,1), default_text='original video', enable_events=True, readonly=True), sg.FileBrowse(button_text='browse', initial_folder=media_path, file_types=[('MP4 Video Files','*.mp4')])],
-        [sg.Input(key='-NEW_AUDIO-', size=(12,1), default_text='edited audio', enable_events=True, readonly=True), sg.FileBrowse(button_text='browse', initial_folder=media_path, file_types=[('MP3 Audio Files','*.mp3')])],
+        [sg.Input(key='-ORIGINAL_VIDEO-', size=(12,1), default_text='original video', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_VIDEO-', button_text='browse', initial_folder=media_path, file_types=[('MP4 Video Files','*.mp4')])],
+        [sg.Input(key='-NEW_AUDIO-', size=(12,1), default_text='edited audio', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_AUDIO-', button_text='browse', initial_folder=media_path, file_types=[('MP3 Audio Files','*.mp3')])],
         [sg.Input(key='-FINAL_NAME-', pad=((5,5),(20,8)), default_text='final file name')],
-        [sg.Button('add process', size=(19, 1))]
+        [sg.Button(key='-ADD_PROCESS-', button_text='add process', size=(19, 1))]
     ],
     vertical_alignment='top'
 )
@@ -92,7 +105,7 @@ progress_bar = sg.Graph(
 
 layout = [
     [process_list, create_process_form],
-    [sg.Button('start'), progress_bar]
+    [sg.Button('start', key='-START-'), progress_bar]
 ]
 
 window = sg.Window('audio replacer', layout, size=(600,270), finalize=True)
@@ -115,11 +128,9 @@ while True:
         change_input_values('reset' if values[event][0] == 'add new process' else None)
 
     # Add process
-    if event == 'add process':
+    if event == '-ADD_PROCESS-':
         message = create_new_process()
-        for figure in progress_bar.get_figures_at_location((10,17)):
-            progress_bar.delete_figure(figure)
-        progress_bar.draw_text(text=message, location=(10, 17), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
+        change_progress_text(message)
         if message == 'process added':
             window['-PROCESS_LIST-'].update(processes)
             change_input_values('reset')
@@ -132,7 +143,11 @@ while True:
         window['-PROCESS_LIST-'].update(processes)
         change_input_values('reset')
 
-    if event == 'start':
-        start_processes()
+    if event == '-START-':
+        if len(processes) == 1:
+            change_progress_text('no processes')
+        else:
+            moviepy = Thread(target=start_processes)
+            moviepy.start()
 
 window.close()
