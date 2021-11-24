@@ -108,20 +108,19 @@ def toggle_disable_elements(disabled=True):
 def change_progress_text(message):
     for figure in progress_bar.get_figures_at_location((10,17)):
         progress_bar.delete_figure(figure)
-    progress_bar.draw_text(text=message, location=(10, 17), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
+    progress_bar.draw_text(text=message, location=(10, 14), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
 
 media_path = getcwd() + '/media'
-
-# print(media_path)
 
 create_process_form = sg.Column(
     layout=[
         [sg.Input(key='-ORIGINAL_VIDEO-', size=(12,1), default_text='original video', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_VIDEO-', button_text='browse', initial_folder=media_path, file_types=[('MP4 Video Files','*.mp4')])],
         [sg.Input(key='-NEW_AUDIO-', size=(12,1), default_text='edited audio', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_AUDIO-', button_text='browse', initial_folder=media_path, file_types=[('MP3 Audio Files','*.mp3')])],
-        [sg.Input(key='-FINAL_NAME-', pad=((5,5),(20,8)), default_text='final file name')],
-        [sg.Button(key='-ADD_PROCESS-', button_text='add process', size=(19, 1))]
+        [sg.Input(key='-FINAL_NAME-', size=(20,1), pad=((5,5),(10,2)), default_text='final file name')],
+        [sg.Button(key='-ADD_PROCESS-', button_text='add process', size=(17, 1))]
     ],
-    vertical_alignment='top'
+    vertical_alignment='top',
+    pad=(8,8),
 )
 
 process_list = sg.Listbox(
@@ -135,11 +134,11 @@ process_list = sg.Listbox(
 
 progress_bar = sg.Graph(
     key='-PROGRESS_BAR-',
-    canvas_size=(470, 35),
+    canvas_size=(245, 25),
     graph_bottom_left=(0,0),
-    graph_top_right=(470, 35),
+    graph_top_right=(245, 25),
     background_color='#ffffff',
-    pad=(5,8)
+    pad=(5,2)
 )
 
 layout = [
@@ -147,9 +146,9 @@ layout = [
     [sg.Button('start', key='-START-'), progress_bar]
 ]
 
-window = sg.Window('audio replacer', layout, size=(600,270), finalize=True)
+window = sg.Window('audio replacer', layout, finalize=True)
 
-progress_bar.draw_text(text='not started', location=(10, 17), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
+change_progress_text('not started')
 
 while True:
     event, values = window.read()
