@@ -64,14 +64,14 @@ class MyBarLogger(TqdmProgressBarLogger):
     def callback(self, **changes):
         # Every time the logger is updated, this function is called
         if len(self.bars):
-            print(self.bars)
-            for figure in progress_bar.get_figures_at_location((0,35)):
+            #print(self.bars)
+            for figure in progress_bar.get_figures_at_location((0,interface_parameters['progress_bar_size'][1])):
                 progress_bar.delete_figure(figure)
 
             percentage = next(reversed(self.bars.items()))[1]['index'] / next(reversed(self.bars.items()))[1]['total']
 
-            length = percentage * 470
-            progress_bar.send_figure_to_back(progress_bar.draw_rectangle(top_left=(0,35), bottom_right=(length,0), fill_color='#a5e8c0', line_width=0))
+            length = percentage * interface_parameters['progress_bar_size'][0]
+            progress_bar.send_figure_to_back(progress_bar.draw_rectangle(top_left=(0,interface_parameters['progress_bar_size'][1]), bottom_right=(length,0), fill_color='#a5e8c0', line_width=0))
 
             if next(reversed(self.bars.items()))[0] == 'chunk':
                 if self.pre_render == False:
@@ -106,86 +106,107 @@ def toggle_disable_elements(disabled=True):
         window[element].update(disabled=disabled)
 
 def change_progress_text(message):
-    for figure in progress_bar.get_figures_at_location((10,17)):
+    for figure in progress_bar.get_figures_at_location(interface_parameters['progress_bar_text_pos']):
         progress_bar.delete_figure(figure)
-    progress_bar.draw_text(text=message, location=(10, 14), text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
+    progress_bar.draw_text(text=message, location=interface_parameters['progress_bar_text_pos'], text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
 
-media_path = getcwd() + '/media'
+def create_interface():
+    media_path = getcwd() + '/media'
 
-create_process_form = sg.Column(
-    layout=[
-        [sg.Input(key='-ORIGINAL_VIDEO-', size=(12,1), default_text='original video', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_VIDEO-', button_text='browse', initial_folder=media_path, file_types=[('MP4 Video Files','*.mp4')])],
-        [sg.Input(key='-NEW_AUDIO-', size=(12,1), default_text='edited audio', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_AUDIO-', button_text='browse', initial_folder=media_path, file_types=[('MP3 Audio Files','*.mp3')])],
-        [sg.Input(key='-FINAL_NAME-', size=(20,1), pad=((5,5),(10,2)), default_text='final file name')],
-        [sg.Button(key='-ADD_PROCESS-', button_text='add process', size=(17, 1))]
-    ],
-    vertical_alignment='top',
-    pad=(8,8),
-)
+    create_process_form = sg.Column(
+        layout=[
+            [sg.Input(key='-ORIGINAL_VIDEO-', size=(12,1), default_text='original video', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_VIDEO-', button_text='browse', initial_folder=media_path, file_types=[('MP4 Video Files','*.mp4')])],
+            [sg.Input(key='-NEW_AUDIO-', size=(12,1), default_text='edited audio', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_AUDIO-', button_text='browse', initial_folder=media_path, file_types=[('MP3 Audio Files','*.mp3')])],
+            [sg.Input(key='-FINAL_NAME-', size=interface_parameters['final_name_input_size'], pad=interface_parameters['final_name_input_pad'], default_text='final file name')],
+            [sg.Button(key='-ADD_PROCESS-', button_text='add process', size=interface_parameters['add_process_button_size'])]
+        ],
+        vertical_alignment='top',
+        pad=(8,8),
+    )
 
-process_list = sg.Listbox(
-    key='-PROCESS_LIST-',
-    select_mode=sg.LISTBOX_SELECT_MODE_SINGLE,
-    values=processes,
-    size=(15,7),
-    enable_events=True,
-    right_click_menu=['', ['Delete']]
-)
+    process_list = sg.Listbox(
+        key='-PROCESS_LIST-',
+        select_mode=sg.LISTBOX_SELECT_MODE_SINGLE,
+        values=processes,
+        size=(15,7),
+        enable_events=True,
+        right_click_menu=['', ['Delete']]
+    )
 
-progress_bar = sg.Graph(
-    key='-PROGRESS_BAR-',
-    canvas_size=(245, 25),
-    graph_bottom_left=(0,0),
-    graph_top_right=(245, 25),
-    background_color='#ffffff',
-    pad=(5,2)
-)
+    global progress_bar
+    progress_bar = sg.Graph(
+        key='-PROGRESS_BAR-',
+        canvas_size=interface_parameters['progress_bar_size'],
+        graph_bottom_left=(0,0),
+        graph_top_right=interface_parameters['progress_bar_size'],
+        background_color='#ffffff',
+        pad=interface_parameters['progress_bar_pad']
+    )
 
-layout = [
-    [process_list, create_process_form],
-    [sg.Button('start', key='-START-'), progress_bar]
-]
+    layout = [
+        [process_list, create_process_form],
+        [sg.Button('start', key='-START-'), progress_bar]
+    ]
+    global window
+    window = sg.Window('audio replacer', layout, finalize=True)
 
-window = sg.Window('audio replacer', layout, finalize=True)
+    change_progress_text('not started')
 
-change_progress_text('not started')
+def event_loop():
+    print(interface_parameters)
+    while True:
+        global values
+        event, values = window.read()
+        print(event, values)
+        if event in (None, sg.WINDOW_CLOSED):
+            break
 
-while True:
-    event, values = window.read()
-    print(event, values)
-    if event in (None, sg.WINDOW_CLOSED):
-        break
+        # Show selected file name
+        if event in ('-ORIGINAL_VIDEO-', '-NEW_AUDIO-'):
+            if len(values[event].split('.')) != 1:
+                window[event].update(values[event].split('/')[-1])
 
-    # Show selected file name
-    if event in ('-ORIGINAL_VIDEO-', '-NEW_AUDIO-'):
-        if len(values[event].split('.')) != 1:
-            window[event].update(values[event].split('/')[-1])
+        # Change values according to selected process
+        if event == '-PROCESS_LIST-':
+            change_input_values('reset' if values[event][0] == 'add new process' else None)
 
-    # Change values according to selected process
-    if event == '-PROCESS_LIST-':
-        change_input_values('reset' if values[event][0] == 'add new process' else None)
+        # Add process
+        if event == '-ADD_PROCESS-':
+            message = create_new_process()
+            change_progress_text(message)
+            if message == 'process added':
+                window['-PROCESS_LIST-'].update(processes)
+                change_input_values('reset')
 
-    # Add process
-    if event == '-ADD_PROCESS-':
-        message = create_new_process()
-        change_progress_text(message)
-        if message == 'process added':
+        # Delete process
+        if event == 'Delete':
+            for process in processes[1:]:
+                if process == values['-PROCESS_LIST-'][0]:
+                    processes.remove(process)
             window['-PROCESS_LIST-'].update(processes)
             change_input_values('reset')
 
-    # Delete process
-    if event == 'Delete':
-        for process in processes[1:]:
-            if process == values['-PROCESS_LIST-'][0]:
-                processes.remove(process)
-        window['-PROCESS_LIST-'].update(processes)
-        change_input_values('reset')
+        if event == '-START-':
+            if len(processes) == 1:
+                change_progress_text('no processes')
+            else:
+                moviepy = Thread(target=start_processes)
+                moviepy.start()
 
-    if event == '-START-':
-        if len(processes) == 1:
-            change_progress_text('no processes')
-        else:
-            moviepy = Thread(target=start_processes)
-            moviepy.start()
+    window.close()
 
-window.close()
+def run():
+    create_interface()
+    event_loop()
+
+if __name__ == '__main__':
+    interface_parameters = {
+        'media_input_size': (12,1),
+        'final_name_input_size': (20,1),
+        'final_name_input_pad': ((5,5),(10,2)),
+        'add_process_button_size': (17, 1),
+        'progress_bar_size': (245, 25),
+        'progress_bar_text_pos': (10, 14),
+        'progress_bar_pad': (5,2)
+    }
+    run()
