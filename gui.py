@@ -1,10 +1,10 @@
 import PySimpleGUI as sg
 from moviepy.editor import VideoFileClip, AudioFileClip
 from os import getcwd
-from threading import Thread
+# from threading import Thread
+from multiprocessing import Process, Queue, Pipe
 from proglog import TqdmProgressBarLogger
-
-processes = ['add new process']
+from time import sleep
 
 class Lesson():
     def __init__(self, original_video, new_audio, final_name):
@@ -15,108 +15,48 @@ class Lesson():
     def __str__(self) -> str:
         return self.final_name.split('.')[0]
 
-def check_if_process_exists():
-    for process in processes[1:]:
-        if values['-FINAL_NAME-'] == str(process):
-            return True
-    else:
-        return False
+    def __getstate__(self):
+        return self.__dict__
+        
+    def __setstate__(self, d):
+        self.__dict__ = d
 
-def create_new_process():
-    original_video = values['-ORIGINAL_VIDEO-']
-    new_audio = values['-NEW_AUDIO-']
-    final_name = values['-FINAL_NAME-']
+def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui):
+    processes = ['add new process']
 
-    if check_if_process_exists() == True:
-        return 'duplicate names not allowed'
+    def change_input_values(type=None):
+        if type == 'reset':
+                window['-ORIGINAL_VIDEO-'].update(value='original video')
+                window['-NEW_AUDIO-'].update(value='edited audio')
+                window['-FINAL_NAME-'].update(value='final file name')
+        else:
+            window['-ORIGINAL_VIDEO-'].update(value=values['-PROCESS_LIST-'][0].original_video)
+            window['-NEW_AUDIO-'].update(value=values['-PROCESS_LIST-'][0].new_audio)
+            window['-FINAL_NAME-'].update(value=values['-PROCESS_LIST-'][0].final_name)
 
-    if original_video != 'original video' and new_audio != 'edited audio' and final_name != 'final file name':
-        if len(values['-FINAL_NAME-'].split('.')) == 1:
-            final_name += '.mp4'
+    def toggle_disable_elements(disabled=True):
+        elements = ['-PROCESS_LIST-', '-ORIGINAL_VIDEO-', '-NEW_AUDIO-', '-FINAL_NAME-', '-BROWSE_VIDEO-', '-BROWSE_AUDIO-', '-ADD_PROCESS-', '-START-']
+        for element in elements:
+            window[element].update(disabled=disabled)
 
-        processes.append(Lesson(original_video, new_audio, final_name))
+    def change_progress_text(message):
+        for figure in progress_bar.get_figures_at_location(interface_parameters['progress_bar_text_pos']):
+            progress_bar.delete_figure(figure)
+        progress_bar.draw_text(text=message, location=interface_parameters['progress_bar_text_pos'], text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
 
-        return 'process added'
-    else:
-        return 'not complete'
+    def progress_bar_updater(percentage):
+        for figure in progress_bar.get_figures_at_location((0,interface_parameters['progress_bar_size'][1])):
+            progress_bar.delete_figure(figure)
 
+        length = percentage * interface_parameters['progress_bar_size'][0]
+        progress_bar.send_figure_to_back(progress_bar.draw_rectangle(top_left=(0,interface_parameters['progress_bar_size'][1]), bottom_right=(length,0), fill_color='#a5e8c0', line_width=0))
 
-def start_processes():
-    toggle_disable_elements()
-    for process in processes[1:]:
-        my_logger = MyBarLogger(str(process))
-
-        lesson = VideoFileClip('media/' + process.original_video)
-        new_audio = AudioFileClip('media/' + process.new_audio)
-        new_clip = lesson.set_audio(new_audio)
-        new_clip.write_videofile('media/' + process.final_name, logger=my_logger)
-    toggle_disable_elements(False)
-
-# Class that accesses the MoviePy progress bar to display it using the PySimpleGUI Graph
-class MyBarLogger(TqdmProgressBarLogger):
-
-    def __init__(self, name):
-        self.pre_render = False
-        self.rendering = False
-        self.name = name
-        super().__init__()
-
-    def callback(self, **changes):
-        # Every time the logger is updated, this function is called
-        if len(self.bars):
-            #print(self.bars)
-            for figure in progress_bar.get_figures_at_location((0,interface_parameters['progress_bar_size'][1])):
-                progress_bar.delete_figure(figure)
-
-            percentage = next(reversed(self.bars.items()))[1]['index'] / next(reversed(self.bars.items()))[1]['total']
-
-            length = percentage * interface_parameters['progress_bar_size'][0]
-            progress_bar.send_figure_to_back(progress_bar.draw_rectangle(top_left=(0,interface_parameters['progress_bar_size'][1]), bottom_right=(length,0), fill_color='#a5e8c0', line_width=0))
-
-            if next(reversed(self.bars.items()))[0] == 'chunk':
-                if self.pre_render == False:
-                    change_progress_text(f'pre-rendering... ({self.name})')
-                    self.pre_render = True
-                    self.rendering = False
-            else:
-                if self.rendering == False:
-                    change_progress_text(f'rendering... ({self.name})')
-                    self.pre_render = False
-                    self.rendering = True
-
-
-
-
-# GUI Creation
-
-
-def change_input_values(type=None):
-    if type == 'reset':
-            window['-ORIGINAL_VIDEO-'].update(value='original video')
-            window['-NEW_AUDIO-'].update(value='edited audio')
-            window['-FINAL_NAME-'].update(value='final file name')
-    else:
-        window['-ORIGINAL_VIDEO-'].update(value=values['-PROCESS_LIST-'][0].original_video)
-        window['-NEW_AUDIO-'].update(value=values['-PROCESS_LIST-'][0].new_audio)
-        window['-FINAL_NAME-'].update(value=values['-PROCESS_LIST-'][0].final_name)
-
-def toggle_disable_elements(disabled=True):
-    elements = ['-PROCESS_LIST-', '-ORIGINAL_VIDEO-', '-NEW_AUDIO-', '-FINAL_NAME-', '-BROWSE_VIDEO-', '-BROWSE_AUDIO-', '-ADD_PROCESS-', '-START-']
-    for element in elements:
-        window[element].update(disabled=disabled)
-
-def change_progress_text(message):
-    for figure in progress_bar.get_figures_at_location(interface_parameters['progress_bar_text_pos']):
-        progress_bar.delete_figure(figure)
-    progress_bar.draw_text(text=message, location=interface_parameters['progress_bar_text_pos'], text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
-
-def create_interface():
     media_path = getcwd() + '/media'
 
     create_process_form = sg.Column(
         layout=[
-            [sg.Input(key='-ORIGINAL_VIDEO-', size=(12,1), default_text='original video', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_VIDEO-', button_text='browse', initial_folder=media_path, file_types=[('MP4 Video Files','*.mp4')])],
-            [sg.Input(key='-NEW_AUDIO-', size=(12,1), default_text='edited audio', enable_events=True, readonly=True), sg.FileBrowse(key='-BROWSE_AUDIO-', button_text='browse', initial_folder=media_path, file_types=[('MP3 Audio Files','*.mp3')])],
+            [sg.Input(key='-ORIGINAL_VIDEO-', size=(12,1), default_text='original video', enable_events=True, readonly=True, use_readonly_for_disable=True), sg.FileBrowse(key='-BROWSE_VIDEO-', button_text='browse', initial_folder=media_path, file_types=[('MP4 Video Files','*.mp4')])],
+            [sg.Input(key='-NEW_AUDIO-', size=(12,1), default_text='edited audio', enable_events=True, readonly=True, use_readonly_for_disable=True), sg.FileBrowse(key='-BROWSE_AUDIO-', button_text='browse', initial_folder=media_path, file_types=[('MP3 Audio Files','*.mp3')])],
             [sg.Input(key='-FINAL_NAME-', size=interface_parameters['final_name_input_size'], pad=interface_parameters['final_name_input_pad'], default_text='final file name')],
             [sg.Button(key='-ADD_PROCESS-', button_text='add process', size=interface_parameters['add_process_button_size'])]
         ],
@@ -133,7 +73,6 @@ def create_interface():
         right_click_menu=['', ['Delete']]
     )
 
-    global progress_bar
     progress_bar = sg.Graph(
         key='-PROGRESS_BAR-',
         canvas_size=interface_parameters['progress_bar_size'],
@@ -147,17 +86,66 @@ def create_interface():
         [process_list, create_process_form],
         [sg.Button('start', key='-START-'), progress_bar]
     ]
-    global window
+
     window = sg.Window('audio replacer', layout, finalize=True)
 
     change_progress_text('not started')
 
-def event_loop():
-    print(interface_parameters)
+    def check_if_process_exists():
+        for process in processes[1:]:
+            if values['-FINAL_NAME-'] == str(process):
+                return True
+        else:
+            return False
+
+    def create_new_process():
+        original_video = values['-ORIGINAL_VIDEO-']
+        new_audio = values['-NEW_AUDIO-']
+        final_name = values['-FINAL_NAME-']
+
+        if check_if_process_exists() == True:
+            return 'duplicate names not allowed'
+
+        if original_video != 'original video' and new_audio != 'edited audio' and final_name != 'final file name':
+            if len(values['-FINAL_NAME-'].split('.')) == 1:
+                final_name += '.mp4'
+
+            processes.append(Lesson(original_video, new_audio, final_name))
+
+            return 'process added'
+        else:
+            return 'not complete'
+
+    moviepy_running = False
+
     while True:
-        global values
-        event, values = window.read()
-        print(event, values)
+        event, values = window.read(timeout=10)
+
+        if pipe_pysimplegui.poll():
+            item = pipe_pysimplegui.recv()
+            # print(item)
+            if item == 'finished':
+                toggle_disable_elements(False)
+                moviepy_running = False
+            elif item == 'started':
+                moviepy_running = True
+            elif item == 'wait':
+                moviepy_running = False
+                progress_bar_updater(0.01)
+                window.refresh()
+            elif isinstance(item, float):
+                progress_bar_updater(item)
+            else:
+                change_progress_text(item)
+                progress_bar_updater(0.01)
+                window.refresh()
+
+        if moviepy_running:
+            pipe_pysimplegui.send('give me data')
+
+        if event != '__TIMEOUT__':
+            print(event, values)
+
         if event in (None, sg.WINDOW_CLOSED):
             break
 
@@ -190,14 +178,88 @@ def event_loop():
             if len(processes) == 1:
                 change_progress_text('no processes')
             else:
-                moviepy = Thread(target=start_processes)
-                moviepy.start()
+                toggle_disable_elements()
+                change_progress_text('started...')
 
+                window.refresh()
+
+                for process in processes[1:]:
+                    video_processes.put(process)
+
+                pipe_pysimplegui.send('start')
     window.close()
 
-def run():
-    create_interface()
-    event_loop()
+def moviepy_process(video_processes, pipe_moviepy):
+
+    def start_processes():
+        while not video_processes.empty():
+            process = video_processes.get()
+            my_logger = MyBarLogger(str(process))
+
+            lesson = VideoFileClip('media/' + process.original_video)
+            new_audio = AudioFileClip('media/' + process.new_audio)
+            new_clip = lesson.set_audio(new_audio)
+            new_clip.write_videofile('media/' + process.final_name, logger=my_logger)
+        pipe_moviepy.send('finished')
+
+    # Class that accesses the MoviePy progress bar to display it using the PySimpleGUI Graph
+    class MyBarLogger(TqdmProgressBarLogger):
+
+        def __init__(self, name):
+            self.pre_render = False
+            self.rendering = False
+            self.started = False
+            self.name = name
+            super().__init__()
+
+        def callback(self, **changes):
+            # Every time the logger is updated, this function is called
+            if len(self.bars):
+                if self.started is False:
+                    pipe_moviepy.send('started')
+                    self.started = True
+
+                if pipe_moviepy.poll() and pipe_moviepy.recv() == 'give me data':
+                    #print(self.bars)
+
+                    percentage = next(reversed(self.bars.items()))[1]['index'] / next(reversed(self.bars.items()))[1]['total']
+
+                    if round(percentage, 2) == 1:
+                        self.started = False
+                        pipe_moviepy.send('wait')
+
+                    pipe_moviepy.send(percentage)
+
+                    if next(reversed(self.bars.items()))[0] == 'chunk':
+                        if self.pre_render == False:
+                            # change_progress_text(f'pre-rendering... ({self.name})')
+                            pipe_moviepy.send(f'pre-rendering... ({self.name})')
+                            self.pre_render = True
+                            self.rendering = False
+                    else:
+                        if self.rendering == False:
+                            # change_progress_text(f'rendering... ({self.name})')
+                            pipe_moviepy.send(f'rendering... ({self.name})')
+                            self.pre_render = False
+                            self.rendering = True
+
+    while True:
+        item = pipe_moviepy.recv()
+        if item == 'start':
+            start_processes()
+
+
+def main():
+    video_processes = Queue()
+
+    pipe_pysimplegui, pipe_moviepy = Pipe(duplex=True)
+
+    p_pysimplegui = Process(target=pysimplegui_process, args=(interface_parameters, video_processes, pipe_pysimplegui))
+    p_moviepy = Process(target=moviepy_process, args=(video_processes, pipe_moviepy))
+
+    p_pysimplegui.start()
+    p_moviepy.start()
+
 
 if __name__ == '__main__':
     interface_parameters = {
@@ -209,4 +271,4 @@ if __name__ == '__main__':
         'progress_bar_text_pos': (10, 14),
         'progress_bar_pad': (5,2)
     }
-    run()
+    main()
