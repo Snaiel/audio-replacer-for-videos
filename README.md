@@ -13,7 +13,7 @@ When applying an .mp3 of the audio, the overall video would be smaller than if i
 
 ## gui
 
-using PySimpleGUI
+uses PySimpleGUI
 
-![image-20211127143910109](C:\Users\Snaiel\AppData\Roaming\Typora\typora-user-images\image-20211127143910109.png)
+![gui_image](gui_image.png)
 
