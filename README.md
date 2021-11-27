@@ -10,3 +10,10 @@ When applying an .mp3 of the audio, the overall video would be smaller than if i
 * run   main.py
 * it will prompt you for the video, audio, and name of final video
 * it also asks if you want to process another video
+
+## gui
+
+using PySimpleGUI
+
+![image-20211127143910109](C:\Users\Snaiel\AppData\Roaming\Typora\typora-user-images\image-20211127143910109.png)
+

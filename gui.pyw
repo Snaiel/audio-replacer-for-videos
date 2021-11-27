@@ -1,10 +1,8 @@
 import PySimpleGUI as sg
 from moviepy.editor import VideoFileClip, AudioFileClip
 from os import getcwd
-# from threading import Thread
 from multiprocessing import Process, Queue, Pipe
 from proglog import TqdmProgressBarLogger
-from time import sleep
 
 class Lesson():
     def __init__(self, original_video, new_audio, final_name):
