@@ -42,13 +42,20 @@ def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui)
         for figure in progress_bar.get_figures_at_location(interface_parameters['progress_bar_text_pos']):
             progress_bar.delete_figure(figure)
         progress_bar.draw_text(text=message, location=interface_parameters['progress_bar_text_pos'], text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
-            
-    def progress_bar_updater(percentage):
+        
+    def progress_bar_updater(percentage, progress_text_id=None):
         for figure in progress_bar.get_figures_at_location((0,interface_parameters['progress_bar_size'][1])):
             progress_bar.delete_figure(figure)
         if percentage == 0:
-            progress_bar.erase()
-            return
+            for figure in progress_bar.get_figures_at_location(interface_parameters['progress_bar_text_pos']):
+                progress_text_id = figure
+            if progress_text_id:
+                progress_text = progress_bar.tk_canvas.itemcget(progress_text_id, 'text')
+                progress_bar.erase()
+                change_progress_text(progress_text)
+            else:
+                progress_bar.erase()
+            
         length = percentage * interface_parameters['progress_bar_size'][0]
         progress_bar.send_figure_to_back(progress_bar.draw_rectangle(top_left=(0,interface_parameters['progress_bar_size'][1]), bottom_right=(length,0), fill_color='#a5e8c0', line_width=0))
 
@@ -122,7 +129,7 @@ def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui)
     moviepy_running = False
 
     while True:
-        event, values = window.read(timeout=100)
+        event, values = window.read(timeout=20)
 
         if pipe_pysimplegui.poll():
             item = pipe_pysimplegui.recv()
@@ -203,8 +210,8 @@ def moviepy_process(video_processes, pipe_moviepy):
             process = video_processes.get()
             my_logger = MyBarLogger(str(process))
 
-            lesson = VideoFileClip('media/' + process.original_video).subclip(0, 10)
-            new_audio = AudioFileClip('media/' + process.new_audio).subclip(0, 10)
+            lesson = VideoFileClip('media/' + process.original_video)
+            new_audio = AudioFileClip('media/' + process.new_audio)
             new_clip = lesson.set_audio(new_audio)
             new_clip.write_videofile('media/' + process.final_name, logger=my_logger)
         pipe_moviepy.send('finished')
