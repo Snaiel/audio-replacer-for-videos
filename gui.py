@@ -3,8 +3,9 @@ from moviepy.editor import VideoFileClip, AudioFileClip
 from os import getcwd
 from multiprocessing import Process, Queue, Pipe
 from proglog import TqdmProgressBarLogger
+from time import sleep
 
-class Lesson():
+class Video():
     def __init__(self, original_video, new_audio, final_name):
         self.original_video = original_video
         self.new_audio = new_audio
@@ -41,11 +42,13 @@ def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui)
         for figure in progress_bar.get_figures_at_location(interface_parameters['progress_bar_text_pos']):
             progress_bar.delete_figure(figure)
         progress_bar.draw_text(text=message, location=interface_parameters['progress_bar_text_pos'], text_location=sg.TEXT_LOCATION_LEFT, font=('Helvetica','10'), color="#696969")
-
+            
     def progress_bar_updater(percentage):
         for figure in progress_bar.get_figures_at_location((0,interface_parameters['progress_bar_size'][1])):
             progress_bar.delete_figure(figure)
-
+        if percentage == 0:
+            progress_bar.erase()
+            return
         length = percentage * interface_parameters['progress_bar_size'][0]
         progress_bar.send_figure_to_back(progress_bar.draw_rectangle(top_left=(0,interface_parameters['progress_bar_size'][1]), bottom_right=(length,0), fill_color='#a5e8c0', line_width=0))
 
@@ -108,35 +111,40 @@ def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui)
             if len(values['-FINAL_NAME-'].split('.')) == 1:
                 final_name += '.mp4'
 
-            processes.append(Lesson(original_video, new_audio, final_name))
+            video = Video(original_video, new_audio, final_name)
 
-            return 'process added'
+            processes.append(video)
+
+            return f'process added: {video}'
         else:
-            return 'not complete'
+            return f'not complete'
 
     moviepy_running = False
 
     while True:
-        event, values = window.read(timeout=10)
+        event, values = window.read(timeout=100)
 
         if pipe_pysimplegui.poll():
             item = pipe_pysimplegui.recv()
             # print(item)
             if item == 'finished':
+                progress_bar_updater(0)
+                change_progress_text('finished queue')
+                processes = ['add new process']
                 toggle_disable_elements(False)
+                window['-PROCESS_LIST-'].update(processes)
                 moviepy_running = False
             elif item == 'started':
                 moviepy_running = True
             elif item == 'wait':
                 moviepy_running = False
-                progress_bar_updater(0.01)
-                window.refresh()
+                # progress_bar_updater(1)
             elif isinstance(item, float):
                 progress_bar_updater(item)
             else:
+                # print(item)
+                progress_bar_updater(0)
                 change_progress_text(item)
-                progress_bar_updater(0.01)
-                window.refresh()
 
         if moviepy_running:
             pipe_pysimplegui.send('give me data')
@@ -160,7 +168,7 @@ def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui)
         if event == '-ADD_PROCESS-':
             message = create_new_process()
             change_progress_text(message)
-            if message == 'process added':
+            if 'process added' in message:
                 window['-PROCESS_LIST-'].update(processes)
                 change_input_values('reset')
 
@@ -186,6 +194,7 @@ def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui)
 
                 pipe_pysimplegui.send('start')
     window.close()
+    pipe_pysimplegui.send('close')
 
 def moviepy_process(video_processes, pipe_moviepy):
 
@@ -194,8 +203,8 @@ def moviepy_process(video_processes, pipe_moviepy):
             process = video_processes.get()
             my_logger = MyBarLogger(str(process))
 
-            lesson = VideoFileClip('media/' + process.original_video)
-            new_audio = AudioFileClip('media/' + process.new_audio)
+            lesson = VideoFileClip('media/' + process.original_video).subclip(0, 10)
+            new_audio = AudioFileClip('media/' + process.new_audio).subclip(0, 10)
             new_clip = lesson.set_audio(new_audio)
             new_clip.write_videofile('media/' + process.final_name, logger=my_logger)
         pipe_moviepy.send('finished')
@@ -220,7 +229,28 @@ def moviepy_process(video_processes, pipe_moviepy):
                 if pipe_moviepy.poll() and pipe_moviepy.recv() == 'give me data':
                     #print(self.bars)
 
+                    if next(reversed(self.bars.items()))[0] == 'chunk':
+                        if self.pre_render == False:
+                            # change_progress_text(f'pre-rendering... ({self.name})')
+                            pipe_moviepy.send(f'pre-rendering... ({self.name})')
+                            self.pre_render = True
+                            self.rendering = False
+                            return
+                    else:
+                        if self.rendering == False:
+                            # change_progress_text(f'rendering... ({self.name})')
+                            pipe_moviepy.send(f'rendering... ({self.name})')
+                            self.pre_render = False
+                            self.rendering = True 
+                            return
+
                     percentage = next(reversed(self.bars.items()))[1]['index'] / next(reversed(self.bars.items()))[1]['total']
+
+                    if percentage < 0:
+                        percentage = 0
+
+                    if percentage > 1:
+                        percentage = 1
 
                     if round(percentage, 2) == 1:
                         self.started = False
@@ -228,23 +258,13 @@ def moviepy_process(video_processes, pipe_moviepy):
 
                     pipe_moviepy.send(percentage)
 
-                    if next(reversed(self.bars.items()))[0] == 'chunk':
-                        if self.pre_render == False:
-                            # change_progress_text(f'pre-rendering... ({self.name})')
-                            pipe_moviepy.send(f'pre-rendering... ({self.name})')
-                            self.pre_render = True
-                            self.rendering = False
-                    else:
-                        if self.rendering == False:
-                            # change_progress_text(f'rendering... ({self.name})')
-                            pipe_moviepy.send(f'rendering... ({self.name})')
-                            self.pre_render = False
-                            self.rendering = True
 
     while True:
         item = pipe_moviepy.recv()
         if item == 'start':
             start_processes()
+        elif item == 'close':
+            break
 
 
 def main():
@@ -257,6 +277,14 @@ def main():
 
     p_pysimplegui.start()
     p_moviepy.start()
+
+    while True:
+        if p_pysimplegui.is_alive() and p_moviepy.is_alive():
+            pass
+        else:
+            p_pysimplegui.terminate()
+            p_moviepy.terminate()
+            return
 
 
 if __name__ == '__main__':

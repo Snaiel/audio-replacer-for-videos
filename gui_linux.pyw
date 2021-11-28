@@ -9,4 +9,4 @@ gui.interface_parameters = {
     'progress_bar_text_pos': (10, 17),
     'progress_bar_pad': (5,8)
     }
-gui.run()
+gui.main()
