@@ -95,7 +95,7 @@ def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui)
         [sg.Button('start', key='-START-'), progress_bar]
     ]
 
-    window = sg.Window('audio replacer', layout, finalize=True)
+    window = sg.Window('audio replacer', layout, finalize=True, icon='Audio Replacer.png')
 
     change_progress_text('not started')
 
@@ -156,8 +156,8 @@ def pysimplegui_process(interface_parameters, video_processes, pipe_pysimplegui)
         if moviepy_running:
             pipe_pysimplegui.send('give me data')
 
-        if event != '__TIMEOUT__':
-            print(event, values)
+        # if event != '__TIMEOUT__':
+        #     print(event, values)
 
         if event in (None, sg.WINDOW_CLOSED):
             break

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import gui
 
 gui.interface_parameters = {
